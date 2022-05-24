@@ -231,11 +231,13 @@ class PointSource(ParametricSeismicSource):
             self.radius[m] = math.sqrt(rup_length ** 2 + rup_width ** 2) / 2.0
         return self.radius[-1]  # max radius
 
-    def get_planar(self, shift_hypo=False, iruptures=False):
+    def get_planar(self, shift_hypo=False, iruptures=False, maxmag=False):
         """
         :returns: a dictionary mag -> list of arrays of shape (U, 3)
         """
         magd = [(r, mag) for mag, r in self.get_annual_occurrence_rates()]
+        if maxmag:
+            magd = [magd[-1]]
         if isinstance(self, CollapsedPointSource) and not iruptures:
             out = AccumDict(accum=[])
             for src in self.pointsources:

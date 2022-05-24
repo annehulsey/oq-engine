@@ -58,6 +58,15 @@ KNOWN_DISTANCES = frozenset(
 IGNORE_PARAMS = {'mag', 'rrup', 'vs30', 'occurrence_rate', 'sids', 'mdvbin'}
 
 
+def count_nsites(src, sites, maxdist):
+    """
+    :returns: how many sites are impacted from the maximum magnitude rupture
+    """
+    [(mag, [planar])] = src.get_planar(iruptures=True, maxmag=True).items()
+    rrup = project(planar, sites.xyz)[0, 0]  # shape N
+    return (rrup < maxdist(mag) + src.radius[-1]).sum()
+
+
 def concat(ctxs):
     """
     Concatenate context arrays.
@@ -1079,16 +1088,15 @@ class ContextMaker(object):
             return 0
         src.nsites = len(sites)
         N = len(srcfilter.sitecol.complete)  # total sites
+        if hasattr(src, 'pointsources'):
+            nsites = count_nsites(src, sites, self.maximum_distance)
+            return src.num_ruptures * (nsites / N + .02)
+
         ctxs = self.get_ctxs(src, sites, step=10)  # reduced number
         if not ctxs:
             return src.num_ruptures if N == 1 else 0
         nsites = numpy.array([len(ctx) for ctx in ctxs])
-        if (hasattr(src, 'location') and src.count_nphc() > 1 and
-                self.pointsource_distance < 1000):
-            eff_rups = src.num_ruptures / 6  # heuristic
-        else:
-            eff_rups = src.num_ruptures
-        weight = eff_rups * (nsites.mean() / N + .02)
+        weight = src.num_ruptures * (nsites.mean() / N + .02)
         return weight
 
     def set_weight(self, sources, srcfilter, mon=Monitor()):
