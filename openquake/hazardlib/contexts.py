@@ -727,8 +727,7 @@ class ContextMaker(object):
             # building planar geometries
             planardict = src.get_planar(self.shift_hypo)
 
-        magdist = {mag: self.maximum_distance(mag)
-                   for mag, rate in src.get_annual_occurrence_rates()}
+        magdist = {mag: self.maximum_distance(mag) for mag in planardict}
         ctxs = []
         for mag, planarlist, sites in self._triples(
                 src, sitecol, planardict):
