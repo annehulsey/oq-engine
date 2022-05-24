@@ -1088,11 +1088,12 @@ class ContextMaker(object):
             return 0
         src.nsites = len(sites)
         N = len(srcfilter.sitecol.complete)  # total sites
+        step = 10
         if hasattr(src, 'pointsources'):
             nsites = count_nsites(src, sites, self.maximum_distance)
-            return src.num_ruptures * (nsites / N + .02)
+            return len(src.radius) * len(src.pointsources) * (nsites / N + .02)
 
-        ctxs = self.get_ctxs(src, sites, step=10)  # reduced number
+        ctxs = self.get_ctxs(src, sites, step=step)  # reduced number
         if not ctxs:
             return src.num_ruptures if N == 1 else 0
         nsites = numpy.array([len(ctx) for ctx in ctxs])
