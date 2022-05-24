@@ -58,13 +58,19 @@ KNOWN_DISTANCES = frozenset(
 IGNORE_PARAMS = {'mag', 'rrup', 'vs30', 'occurrence_rate', 'sids', 'mdvbin'}
 
 
-def count_nsites(src, sites, maxdist):
+def count_nsites(src, sites, psdist):
     """
-    :returns: how many sites are impacted from the maximum magnitude rupture
+    :returns: how many sites are impacted per magnitude
     """
-    [(mag, [planar])] = src.get_planar(iruptures=True, maxmag=True).items()
-    rrup = project(planar, sites.xyz)[0, 0]  # shape N
-    return (rrup < maxdist(mag) + src.radius[-1]).sum()
+    nphc = src.count_nphc()
+    nsites = numpy.zeros_like(src.radius)
+    planardict = src.get_planar(iruptures=True)
+    for m, (mag, [planar]) in enumerate(planardict.items()):
+        rrup = project(planar, sites.xyz)[0, 0]  # shape N
+        nclose = (rrup < psdist + src.radius[m]).sum()
+        nfar = len(sites) - nclose
+        nsites[m] = nclose + nfar / nphc
+    return nsites
 
 
 def concat(ctxs):
@@ -1090,8 +1096,8 @@ class ContextMaker(object):
         N = len(srcfilter.sitecol.complete)  # total sites
         step = 10
         if hasattr(src, 'pointsources'):
-            nsites = count_nsites(src, sites, self.maximum_distance)
-            return len(src.radius) * len(src.pointsources) * (nsites / N + .02)
+            nsites = count_nsites(src, sites, self.pointsource_distance)
+            return src.num_ruptures * (nsites.mean() / N + .02)
 
         ctxs = self.get_ctxs(src, sites, step=step)  # reduced number
         if not ctxs:
