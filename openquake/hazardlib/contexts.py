@@ -249,38 +249,6 @@ class Collapser(object):
         return out.view(numpy.recarray), allsids
 
 
-class Timer(object):
-    """
-    Timer used to save the time needed to process each source and to
-    postprocess it with ``Timer('timer.csv').read_df()``. To use it, run
-    the calculation on a single machine with
-
-    OQ_TIMER=timer.csv oq run job.ini
-    """
-    fields = ['source_id', 'code', 'effrups', 'nsites', 'weight',
-              'numctxs', 'numsites', 'dt', 'task_no']
-
-    def __init__(self, fname):
-        self.fname = fname
-
-    def save(self, src, numctxs, numsites, dt, task_no):
-        # save the source info
-        if self.fname:
-            row = [src.source_id, src.code.decode('ascii'),
-                   src.num_ruptures, src.nsites, src.weight,
-                   numctxs, numsites, dt, task_no]
-            open(self.fname, 'a').write(','.join(map(str, row)) + '\n')
-
-    def read_df(self):
-        # method used to postprocess the information
-        df = pandas.read_csv(self.fname, names=self.fields, index_col=0)
-        df['speed'] = df['weight'] / df['dt']
-        return df.sort_values('dt')
-
-
-# object used to measure the time needed to process each source
-timer = Timer(os.environ.get('OQ_TIMER'))
-
 
 class FarAwayRupture(Exception):
     """Raised if the rupture is outside the maximum distance for all sites"""
@@ -723,7 +691,7 @@ class ContextMaker(object):
 
     def get_ctxs_planar(self, src, sitecol):
         """
-        :param src: a (Collapsed)PointSource with no PointMSR
+        :param src: a (Collapsed)PointSource
         :param sitecol: a filtered SiteCollection
         :returns: a list with 0 or 1 context array
         """
@@ -807,8 +775,7 @@ class ContextMaker(object):
         """
         self.fewsites = len(sitecol.complete) <= self.max_sites_disagg
         ctxs = []
-        if getattr(src, 'location', None) and step == 1 and (  # point source
-                str(src.magnitude_scaling_relationship) != 'PointMSR'):
+        if getattr(src, 'location', None) and step == 1:
             return self.get_ctxs_planar(src, sitecol)
         elif hasattr(src, 'source_id'):  # other source
             with self.ir_mon:
@@ -1158,7 +1125,7 @@ def print_finite_size(rups):
     print(c)
     print('total finite size ruptures = ', sum(c.values()))
 
-
+    
 class PmapMaker(object):
     """
     A class to compute the PoEs from a given source
@@ -1202,26 +1169,25 @@ class PmapMaker(object):
         cm = self.cmaker
         allctxs = []
         totlen = 0
+        t0 = time.time()
         for src in self.group:
-            t0 = time.time()
             ctxs = self._get_ctxs(src)
+            src.nsites = sum(len(ctx) for ctx in ctxs)
+            totlen += src.nsites
             allctxs.extend(ctxs)
-            nsites = sum(len(ctx) for ctx in ctxs)
-            # TODO: remove nrupts
-            totlen += nsites
-            if nsites and totlen > MAXSIZE:
+            if src.nsites and totlen > MAXSIZE:
                 cm.get_pmap(concat(allctxs), pmap)
                 allctxs.clear()
-            dt = time.time() - t0
-            self.source_data['src_id'].append(src.source_id)
-            self.source_data['nsites'].append(nsites)
-            self.source_data['nrupts'].append(nsites)
-            self.source_data['weight'].append(src.weight)
-            self.source_data['ctimes'].append(dt)
-            self.source_data['taskno'].append(cm.task_no)
-            timer.save(src, nsites, nsites, dt, cm.task_no)
         if allctxs:
             cm.get_pmap(concat(allctxs), pmap)
+        dt = time.time() - t0
+        for src in self.group:
+            self.source_data['src_id'].append(src.source_id)
+            self.source_data['nsites'].append(src.nsites)
+            self.source_data['nrupts'].append(src.num_ruptures)
+            self.source_data['weight'].append(src.weight)
+            self.source_data['ctimes'].append(dt * src.nsites / totlen)
+            self.source_data['taskno'].append(cm.task_no)
         return ~pmap if cm.rup_indep else pmap
 
     def _make_src_mutex(self):
