@@ -282,7 +282,7 @@ class PointSource(ParametricSeismicSource):
             magd_ = list(enumerate(magd))
             npd_ = list(enumerate(npd))
             hdd_ = list(enumerate(hdd))
-            for m, (mrate, mag) in magd_[::step]:
+            for m, (mrate, mag) in magd_[::-step]:
                 for n, (nrate, np) in npd_[::step]:
                     for d, (drate, cdep) in hdd_[::step]:
                         rate = mrate * nrate * drate
