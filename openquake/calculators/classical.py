@@ -312,7 +312,7 @@ class ClassicalCalculator(base.HazardCalculator):
         """
         self.init_poes()
         params = {'grp_id', 'occurrence_rate', 'clon', 'clat', 'rrup',
-                  'probs_occur', 'sids', 'src_id'}
+                  'probs_occur', 'sids', 'src_id', 'weight'}
         gsims_by_trt = self.full_lt.get_gsims_by_trt()
 
         for trt, gsims in gsims_by_trt.items():
@@ -359,16 +359,9 @@ class ClassicalCalculator(base.HazardCalculator):
         sources = list(self.csm.source_info)
         size, msg = get_nbytes_msg(
             dict(N=self.N, R=self.R, M=self.M, L1=self.L1, Ns=self.Ns))
-        ps = any(src.code == b'P' for src in self.csm.get_sources())
-        if size > TWO32 and not ps:
+        if size > TWO32:
             raise RuntimeError('The matrix disagg_by_src is too large: %s'
                                % msg)
-        elif size > TWO32:
-            msg = ('The source model contains point sources: you cannot set '
-                   'disagg_by_src=true unless you convert them to multipoint '
-                   'sources with the command oq upgrade_nrml --multipoint %s'
-                   ) % oq.base_path
-            raise RuntimeError(msg)
         return sources
 
     def init_poes(self):
@@ -512,7 +505,6 @@ class ClassicalCalculator(base.HazardCalculator):
                     # else:
                     smap.submit(trip)
                     self.n_outs[grp_id] += 1
-        logging.info('grp_id->n_outs: %s', list(self.n_outs.values()))
         return smap
 
     def collect_hazard(self, acc, pmap_by_kind):
@@ -557,10 +549,6 @@ class ClassicalCalculator(base.HazardCalculator):
                 raise RuntimeError('%s in #%d' % (msg, self.datastore.calc_id))
             elif slow_tasks:
                 logging.info(msg)
-
-        if 'rup' in self.datastore:
-            tot = len(self.datastore['rup/mag'])
-            logging.info('Stored {:_d} ruptures'.format(tot))
 
         if '_poes' in self.datastore:
             self.post_classical()

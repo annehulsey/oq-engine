@@ -1,4 +1,36 @@
+  [Pablo Iturrieta]
+  * Added support for negative binomial temporal occurrence models
+
+  [Marco Pagani, Michele Simionato]
+  * Added support for disaggregation in case of mutually exclusive sources
+
   [Michele Simionato]
+  * Fixed error message when trying to compute disagg_by_src with too many
+    sources: in some cases, it contained a misleading reference to point sources
+  * Fixed disaggregation when a tectonic region type contains a single
+    magnitude, thus breaking the magnitude binning formula
+  * Reorganized the Advanced Manual; changed the theme to be consistent with
+    the OpenQuake manual
+  * Internal: added command `oq db engine_version`
+  * Added a check for required site parameters not passed correctly
+  * Fixed `ps_grid_spacing` approximation when the grid is degenerate
+  * Logging a warning when starting from an old hazard calculation
+  * The extra fields of the site collection were lost when using --hc
+  * Internal: implemented direct database access with OQ_DATABASE=local
+
+  [Julián Santiago Montejo Espitia]
+  * Implemented the Arteta et al. (2021) subduction model for Colombia
+
+  [Michele Simionato]
+  * Added `host` field to the `job` table (dbserver restart required)
+  * `--exports=csv` was not honored for the realizations output; now it is
+
+  [Paul Henshaw, Sandra Giacomini]
+  * Ported the OpenQuake manual from latex to reStructuredText format
+
+  [Michele Simionato]
+  * Entered automatically in sequential mode if there is not enough memory
+  * Raised an early error for missing risk IDs in the vulnerability files
   * Changed the definition of `aggrisk` again to ensure consistency with the
     average losses
 
@@ -47,6 +79,8 @@
   [Marco Pagani]
   * Added the possibility of disaggregating in terms of epsilon*
   * Added a method to compute the cross-correlation matrix
+  * Added Hassani & Atkinson (2018)
+  * Added Hassani & Atkinson (2020)
 
   [Michele Simionato]
   * Fixed disaggregation returning NaNs in some situations with

@@ -1056,8 +1056,7 @@ class OqParam(valid.ParamSet):
         if ('ps_grid_spacing' in names_vals and
                 float(names_vals['ps_grid_spacing']) and
                 'pointsource_distance' not in names_vals):
-            self.pointsource_distance = dict(
-                default=float(names_vals['ps_grid_spacing']))
+            self.pointsource_distance = dict(default=10.)
         if self.collapse_level >= 0:
             self.time_per_task = 1_000_000  # disable task_splitting
 
@@ -1590,6 +1589,14 @@ class OqParam(valid.ParamSet):
         return (self.calculation_mode in
                 'event_based_risk ebrisk event_based_damage')
 
+    def is_valid_disagg_by_src(self):
+        """
+        disagg_by_src can be set only if ps_grid_spacing = 0
+        """
+        if self.disagg_by_src:
+            return self.ps_grid_spacing == 0
+        return True
+
     def is_valid_shakemap(self):
         """
         hazard_calculation_id must be set if shakemap_id is set
@@ -1713,15 +1720,6 @@ class OqParam(valid.ParamSet):
             self.hazard_curves_from_gmfs or self.calculation_mode in
             ('classical', 'disaggregation'))
         return not invalid
-
-    def is_valid_ps_grid_spacing(self):
-        """
-        `ps_grid_spacing` must be smaller than the `pointsource_distance`
-        """
-        if not self.ps_grid_spacing:
-            return True
-        return self.ps_grid_spacing <= calc.filters.getdefault(
-            self.pointsource_distance, 'default')
 
     def is_valid_soil_intensities(self):
         """

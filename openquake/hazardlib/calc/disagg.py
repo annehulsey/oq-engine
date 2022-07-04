@@ -55,6 +55,7 @@ def get_edges_shapedic(oq, sitecol, mags_by_trt):
     """
     :returns: (mag dist lon lat eps trt) edges and shape dictionary
     """
+    assert mags_by_trt
     tl = oq.truncation_level
     if oq.rlz_index is None:
         Z = oq.num_rlzs_disagg
@@ -68,9 +69,11 @@ def get_edges_shapedic(oq, sitecol, mags_by_trt):
         mags.update(float(mag) for mag in _mags)
         trts.append(trt)
     mags = sorted(mags)
-    mag_edges = oq.mag_bin_width * numpy.arange(
-        int(numpy.floor(min(mags) / oq.mag_bin_width)),
-        int(numpy.ceil(max(mags) / oq.mag_bin_width) + 1))
+    n1 = int(numpy.floor(min(mags) / oq.mag_bin_width))
+    n2 = int(numpy.ceil(max(mags) / oq.mag_bin_width) + 1)
+    if n2 == n1 + 1:  # happens when there is a single magnitude
+        n2 = n1 + 2
+    mag_edges = oq.mag_bin_width * numpy.arange(n1, n2)
 
     # build dist_edges
     maxdist = max(oq.maximum_distance.max().values())
@@ -152,7 +155,7 @@ def disaggregate(ctx, cmaker, g_by_z, iml2dict, eps3, sid=0, bin_edges=(),
     poes = numpy.zeros((U, E, M, P, Z))
     pnes = numpy.ones((U, E, M, P, Z))
     # Multi-dimensional iteration
-    min_eps = min(epsilons)
+    min_eps, max_eps = epsilons.min(), epsilons.max()
     for (m, p, z), iml in numpy.ndenumerate(iml3):
         if iml == -numpy.inf:  # zero hazard
             continue
@@ -169,7 +172,7 @@ def disaggregate(ctx, cmaker, g_by_z, iml2dict, eps3, sid=0, bin_edges=(),
         # Now we split the epsilon into parts (one for each epsilon-bin larger
         # than lvls)
         if epsstar:
-            iii = (lvls >= min(epsilons)) & (lvls < max(epsilons))
+            iii = (lvls >= min_eps) & (lvls < max_eps)
             # The leftmost indexes are ruptures and epsilons
             poes[iii, idxs[iii]-1, m, p, z] = truncnorm.sf(lvls[iii])
         else:

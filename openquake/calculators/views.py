@@ -33,6 +33,7 @@ from openquake.baselib.general import (
 from openquake.baselib.hdf5 import FLOAT, INT, get_shape_descr
 from openquake.baselib.performance import performance_view
 from openquake.baselib.python3compat import encode, decode
+from openquake.hazardlib.contexts import KNOWN_DISTANCES
 from openquake.hazardlib.gsim.base import ContextMaker, Collapser
 from openquake.commonlib import util, logictree
 from openquake.risklib.scientific import losses_by_period, return_periods
@@ -179,9 +180,10 @@ def view_worst_sources(token, dstore):
     ser = data.groupby('taskno').ctimes.sum().sort_values().tail(1)
     [[taskno, maxtime]] = ser.to_dict().items()
     data = data[data.taskno == taskno]
-    print('Sources in the slowest task (%d seconds, weight=%d)'
-          % (maxtime, data['weight'].sum()))
+    print('Sources in the slowest task (%d seconds, weight=%d, taskno=%d)'
+          % (maxtime, data['weight'].sum(), taskno))
     data['slow_rate'] = data.ctimes / data.weight
+    del data['taskno']
     df = data.sort_values('ctimes', ascending=False)
     return df[slice(None, None, step)]
 
@@ -1235,13 +1237,13 @@ def view_agg_id(token, dstore):
     """
     Show the available aggregations
     """
-    dfa = dstore.read_df('agg_keys')
-    keys = [col for col in dfa.columns if not col.endswith('_')]
-    df = dfa[keys]
-    totdf = pandas.DataFrame({key: ['*total*'] for key in keys})
-    concat = pandas.concat([df, totdf], ignore_index=True)
-    concat.index.name = 'agg_id'
-    return concat
+    [aggby] = dstore['oqparam'].aggregate_by
+    keys = [key.decode('utf8').split(',') for key in dstore['agg_keys'][:]]
+    keys = numpy.array(keys)  # shape (N, A)
+    dic = {aggkey: keys[:, a] for a, aggkey in enumerate(aggby)}
+    df = pandas.DataFrame(dic)
+    df.index.name = 'agg_id'
+    return df
 
 
 @view.add('mean_perils')
@@ -1306,25 +1308,20 @@ def view_collapsible(token, dstore):
     """
     Show how much the ruptures are collapsed for each site
     """
-    def recarray(mag, rrups, vs30s, dtype=dt('mag rrup vs30')):
-        out = [(mag, rrups[sid], vs30) for sid, vs30 in enumerate(vs30s)]
-        return numpy.array(out, dtype).view(numpy.recarray)
-
-    sitecol = dstore['sitecol']
-    rup_arr = dstore['rup/id'][:]
-    mag_arr = dstore['rup/mag'][:]
-    rrup_arr = dstore['rup/rrup_'][:]
-    sids_arr = dstore['rup/sids_'][:]
-    c1 = Collapser(1)
-    dic = dict(rup_id=[], site_id=[], mdvbin=[])
-    for id, mag, rrup, sids in zip(rup_arr, mag_arr, rrup_arr, sids_arr):
-        mdvbin = c1.calc_mdvbin(recarray(mag, rrup, sitecol.vs30[sids]))
-        for sid, mdv in zip(sids, mdvbin):
-            dic['rup_id'].append(id)
-            dic['site_id'].append(sid)
-            dic['mdvbin'].append(mdv)
+    if ':' in token:
+        collapse_level = int(token.split(':')[1])
+    else:
+        collapse_level = 0
+    dist_types = [dt for dt in dstore['rup'] if dt in KNOWN_DISTANCES]
+    vs30 = dstore['sitecol'].vs30
+    ctx_df = dstore.read_df('rup')
+    ctx_df['vs30'] = vs30[ctx_df.sids]
+    has_vs30 = len(numpy.unique(vs30)) > 1
+    c = Collapser(collapse_level, dist_types, has_vs30)
+    ctx_df['mdvbin'] = c.calc_mdvbin(ctx_df)
+    print('cfactor = %d/%d' % (len(ctx_df), len(ctx_df['mdvbin'].unique())))
     out = []
-    for sid, df in pandas.DataFrame(dic).groupby('site_id'):
+    for sid, df in ctx_df.groupby('sids'):
         n, u = len(df), len(df.mdvbin.unique())
         out.append((sid, u, n, n / u))
     return numpy.array(out, dt('site_id eff_rups num_rups cfactor'))

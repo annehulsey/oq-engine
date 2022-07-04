@@ -83,6 +83,18 @@ class EventBasedRiskTestCase(CalculatorTestCase):
         # this is a case with insured losses and tags
         self.run_calc(case_1.__file__, 'job_eb.ini', concurrent_tasks='4')
 
+        # testing the view agg_id
+        agg_id = view('agg_id', self.calc.datastore)
+        self.assertEqual(str(agg_id), '''\
+       policy taxonomy
+agg_id                
+0           B       RM
+1           B        W
+2           B       RC
+3           A       RM
+4           A        W
+5           A       RC''')
+
         [fname] = export(('avg_losses-stats', 'csv'), self.calc.datastore)
         self.assertEqualFiles('expected/%s' % strip_calc_id(fname), fname,
                               delta=1E-5)
@@ -555,6 +567,4 @@ agg_id
 
     def test_scenario_from_ruptures(self):
         # same files as in test_recompute, but performing a scenario
-        with mock.patch('logging.warning') as warn:
-            self.run_calc(recompute.__file__, 'job_scenario.ini')
-        self.assertIsNone(warn.call_args)  # no inconsistent sums
+        self.run_calc(recompute.__file__, 'job_scenario.ini')
