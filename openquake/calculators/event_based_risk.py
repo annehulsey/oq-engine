@@ -124,9 +124,10 @@ def aggreg(outputs, crmodel, ARKD, aggids, rlz_id, monitor):
     acc = general.AccumDict(accum=numpy.zeros((L, D)))  # u8idx->array
     for out in outputs:
         for li, ln in enumerate(oq.loss_types):
-            if ln not in out or len(out[ln]) == 0:
+            alt = out[out.loss_type == ln]
+            if len(alt) == 0:
                 continue
-            alt = out[ln].reset_index()
+            del alt['loss_type']
             value_cols = alt.columns[2:]  # strip eid, aid
             if oq.avg_losses:
                 with mon_avg:

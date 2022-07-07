@@ -43,6 +43,17 @@ RISK_TYPE_REGEX = re.compile(
     r'(%s|occupants|fragility)_([\w_]+)' % COST_TYPE_REGEX)
 
 
+def out_to_dframe(out):
+    """
+    Convert a dictionary loss_type->df into a single DataFrame
+    """
+    dfs = list(out.values())
+    if isinstance(dfs[0], pandas.DataFrame):  # event based
+        return pandas.concat(dfs, keys=out, names=['loss_type']).reset_index()
+    else:  # do nothing
+        return out
+
+
 def get_risk_files(inputs):
     """
     :param inputs: a dictionary key -> path name
@@ -750,7 +761,7 @@ class CompositeRiskModel(collections.abc.Mapping):
             else:
                 # there is a single output
                 dic[lt] = outs[0]
-        return dic
+        return out_to_dframe(dic)
 
     def get_rmodels_weights(self, loss_type, taxidx):
         """
